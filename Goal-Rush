@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-solidity/contracts/access/AccessControl.sol";
+
+
+contract goalrush_skale_zenith is AccessControl {
+    // Define roles
+    bytes32 public constant SERVER_ROLE = keccak256("SERVER_ROLE");
+    bytes32 public constant PLAYER_ROLE = keccak256("PLAYER_ROLE");
+
+    // Struct to store player data
+    struct Player {
+        uint64 gamesPlayed;  // Number of games played
+        uint64 score;        // Number of score
+        uint64 lastScoreTime; // Timestamp of the last score
+    }
+
+    // Mapping to store player data
+    mapping(address => Player) public players;
+
+    // Events
+    event ScoreRecorded(address indexed player, uint64 score, uint64 timestamp);
+    event StartedGame(address indexed player , uint64 gamesPlayed);
+    event PlayerInitialized(address indexed player);
+
+    // Constructor to set up the initial server role
+    constructor(address admin) {
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(SERVER_ROLE, admin);
+
+        // Make SERVER_ROLE the admin of PLAYER_ROLE
+        _setRoleAdmin(PLAYER_ROLE, SERVER_ROLE);
+    }
+
+    // Function to whitelist a player (grant PLAYER_ROLE)
+    function whitelistPlayer(address player) external onlyRole(SERVER_ROLE) {
+        _grantRole(PLAYER_ROLE, player);
+    }
+
+    // Function to initialize a new player (restricted to PLAYER_ROLE)
+    function initializePlayer() external onlyRole(PLAYER_ROLE) {
+        require(players[msg.sender].gamesPlayed == 0 && players[msg.sender].score == 0, "Player already initialized");
+
+        players[msg.sender] = Player({
+            gamesPlayed: 0,
+            score: 0,
+            lastScoreTime: 0
+        });
+
+        emit PlayerInitialized(msg.sender);
+    }
+
+    // Function to record a score for the player (restricted to SERVER_ROLE)
+    function player_score(address player) external onlyRole(PLAYER_ROLE) {
+
+        Player storage playerData = players[player];
+        playerData.score += 1; // Increment score
+        playerData.lastScoreTime = uint64(block.timestamp); // Record score timestamp
+
+        emit ScoreRecorded(player, playerData.score, playerData.lastScoreTime);
+    }
+
+    // Function to start a game and update games played (restricted to SERVER_ROLE)
+    function startGame(address player) external onlyRole(PLAYER_ROLE) {
+        
+        Player storage playerData = players[player];
+        playerData.gamesPlayed += 1; // Increment games played
+        emit StartedGame(player , playerData.gamesPlayed);
+    }
+
+
+}
